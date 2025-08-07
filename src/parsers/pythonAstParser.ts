@@ -1,12 +1,11 @@
-// pythonAstParser.ts
 
 import { spawn } from "child_process";
-import { ParsedFunction } from "./types";
+import { ParsedFunction } from "../types";
 import * as path from "path";
 
 export function parsePythonWithAST(code: string): Promise<ParsedFunction[]> {
   return new Promise((resolve, reject) => {
-    const scriptPath = path.join(__dirname, "core", "python_parser.py");
+    const scriptPath = path.join(__dirname, "..", "core", "python_parser.py");
     console.log("Python script path:", scriptPath);
 
     const process = spawn("python", [scriptPath]);

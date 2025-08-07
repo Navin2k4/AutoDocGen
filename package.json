@@ -14,16 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "autodocgen.activate",
-        "title": "AutoDocGen: Activate"
-      },
-      {
         "command": "autodocgen.scanCurrentFile",
         "title": "AutoDocGen: Document Current File"
-      },
-      {
-        "command": "autodocgen.scanProject",
-        "title": "AutoDocGen: Document Entire Project"
       },
       {
         "command": "autodocgen.documentSelection",
@@ -31,8 +23,8 @@
         "category": "AutoDocGen"
       },
       {
-        "command": "autodocgen.debugParseCurrentFile",
-        "title": "AutoDocGen: Debug Parse Current File"
+        "command": "autodocgen.resetDocHistory",
+        "title": "AutoDocGen: Reset Doc History"
       }
     ],
     "menus": {
@@ -85,13 +77,16 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc && cpx \"src/core/python_parser.py\" \"out/core\"",
+    "compile": "tsc && node out/scripts/copyNonTSFiles.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@babel/parser": "^7.28.0",
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__traverse": "^7.28.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.102.0",
@@ -102,5 +97,9 @@
     "cpx": "^1.5.0",
     "eslint": "^9.25.1",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.28.0",
+    "@babel/traverse": "^7.28.0"
   }
 }

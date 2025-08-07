@@ -4,24 +4,6 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 import { parseFunctions } from "./parser";
 
-async function debugParseCommand() {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) return;
-
-  const text = editor.document.getText();
-  const language = editor.document.languageId;
-
-  try {
-    const parsedFuncs = await parseFunctions(text, language);
-    console.log("PARSED FUNCS (resolved):", parsedFuncs);
-    vscode.window.showInformationMessage(
-      `Parsed ${parsedFuncs.length} function(s). Check console for details.`
-    );
-  } catch (err) {
-    console.error("Function parsing failed:", err);
-    vscode.window.showErrorMessage("Function parsing failed. See console.");
-  }
-}
 /**
  * Checks above a given line number if there is a real docblock.
  */
@@ -57,100 +39,6 @@ function hasDocCommentAbove(doc: vscode.TextDocument, line: number): boolean {
   return false;
 }
 
-/**
- * Inserts documentation into a document for a given function match.
- */
-async function documentFunctions(
-  document: vscode.TextDocument,
-  text: string,
-  regex: RegExp,
-  historyPath: string,
-  relativePath: string,
-  language: string,
-  edits: vscode.WorkspaceEdit
-) {
-  let history: Record<string, boolean> = {};
-  if (fs.existsSync(historyPath)) {
-    try {
-      history = JSON.parse(fs.readFileSync(historyPath, "utf8"));
-    } catch {
-      history = {};
-    }
-  }
-
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const rawParamsMatch = text.substring(match.index).match(/\(([^)]*)\)/);
-    const args = rawParamsMatch ? rawParamsMatch[1] : "";
-    const params = args
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-
-    const startIndex = match.index;
-    let braceCount = 0;
-    let endIndex = startIndex;
-    for (; endIndex < text.length; endIndex++) {
-      if (text[endIndex] === "{") braceCount++;
-      else if (text[endIndex] === "}") {
-        braceCount--;
-        if (braceCount === 0) break;
-      }
-    }
-    const fullBody = text.substring(startIndex, endIndex).replace(/\s+/g, " ");
-    const hash = crypto.createHash("md5").update(fullBody).digest("hex");
-    const uniqueKey = `${relativePath}::${language}::${hash}`;
-
-    // get target line
-    const pos = document.positionAt(startIndex);
-    const currentLine = pos.line;
-    const hasDoc = hasDocCommentAbove(document, currentLine);
-
-    if (hasDoc) {
-      history[uniqueKey] = true;
-      continue;
-    }
-    if (history[uniqueKey]) {
-      delete history[uniqueKey];
-    }
-
-    // build doc
-    let docText = "";
-    if (language === "python") {
-      docText = `"""\n`;
-      params.forEach((p) => {
-        const [name] = p.split(":").map((s) => s.trim());
-        docText += `:param ${name}: \n`;
-      });
-      docText += `:returns: \n"""\n`;
-    } else if (language === "typescript") {
-      docText = `/**\n`;
-      params.forEach((p) => {
-        const [name, type] = p.split(":").map((s) => s.trim());
-        docText += ` * @param {${type || "any"}} ${name}\n`;
-      });
-      const ret = text
-        .substring(startIndex)
-        .match(/\)\s*:\s*([\w<>\[\]]+)\s*(?:{|=>)/);
-      const returnType = ret ? ret[1] : "void";
-      docText += ` * @returns {${returnType}} \n */\n`;
-    } else {
-      docText = `/**\n`;
-      params.forEach((p) => {
-        const name = p.split(":")[0].trim();
-        docText += ` * @param ${name}\n`;
-      });
-      docText += ` * @returns \n */\n`;
-    }
-
-    edits.insert(document.uri, new vscode.Position(currentLine, 0), docText);
-    history[uniqueKey] = true;
-  }
-
-  if (Object.keys(history).length) {
-    fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
-  }
-}
 
 export function activate(context: vscode.ExtensionContext) {
   /** --- full-file scan --- */
@@ -163,27 +51,6 @@ export function activate(context: vscode.ExtensionContext) {
       const document = editor.document;
       const text = document.getText();
       const language = document.languageId;
-
-      let regex: RegExp | undefined;
-      switch (language) {
-        case "python":
-          regex = /def\s+(\w+)\s*\(([^)]*)\)\s*:/g;
-          break;
-        case "javascript":
-        case "typescript":
-          regex =
-            /(?:function\s+(\w+)\s*\([^)]*\)\s*:?\s*[\w\<\>\[\]]*\s*\{)|(?:const\s+(\w+)\s*=\s*\([^)]*\)\s*:?\s*[\w\<\>\[\]]*\s*=>\s*\{)/g;
-          break;
-        case "java":
-          regex =
-            /(?:public|private|protected)?\s*(?:static\s*)?(?:[\w\<\>\[\]]+\s+)+(\w+)\s*\(([^)]*)\)\s*\{/g;
-          break;
-        default:
-          vscode.window.showInformationMessage(
-            `Language '${language}' not supported.`
-          );
-          return;
-      }
 
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
       if (!workspaceFolder) return;
@@ -200,18 +67,89 @@ export function activate(context: vscode.ExtensionContext) {
       );
       fs.mkdirSync(path.dirname(historyPath), { recursive: true });
 
-      const edits = new vscode.WorkspaceEdit();
-      await documentFunctions(
-        document,
-        text,
-        regex,
-        historyPath,
-        relativePath,
-        language,
-        edits
-      );
+      let history: Record<string, boolean> = {};
+      if (fs.existsSync(historyPath)) {
+        try {
+          history = JSON.parse(fs.readFileSync(historyPath, "utf8"));
+        } catch {
+          history = {};
+        }
+      }
 
-      if (edits.size > 0) {
+      // Use the new parser for all languages
+      let parsedFuncs: any[] = [];
+      try {
+        parsedFuncs = await parseFunctions(text, language);
+        console.log(`Parsed ${language} functions`, parsedFuncs);
+      } catch (err) {
+        vscode.window.showErrorMessage("Function parsing failed. See console.");
+        return;
+      }
+
+      const edits = new vscode.WorkspaceEdit();
+      let insertedCount = 0;
+      for (const fn of parsedFuncs) {
+        // For Python, startIndex/endIndex are line numbers (1-based), for others, they are character indices
+        let currentLine: number;
+        if (language === "python") {
+          currentLine =
+            (typeof fn.startIndex === "number" ? fn.startIndex : 1) - 1;
+        } else {
+          const pos = document.positionAt(fn.startIndex);
+          currentLine = pos.line;
+        }
+        if (currentLine < 0 || currentLine >= document.lineCount) {
+          console.warn(
+            "Skipping function with invalid line:",
+            fn.name,
+            currentLine
+          );
+          continue;
+        }
+        const fullBody = fn.body.replace(/\s+/g, " ");
+        const hash = crypto.createHash("md5").update(fullBody).digest("hex");
+        const uniqueKey = `${relativePath}::${language}::${hash}`;
+        const hasDoc = hasDocCommentAbove(document, currentLine);
+        if (hasDoc) {
+          history[uniqueKey] = true;
+          continue;
+        }
+        if (history[uniqueKey]) {
+          delete history[uniqueKey];
+        }
+        // Build doc
+        let docText = "";
+        if (language === "python") {
+          docText = `"""\n`;
+          fn.params.forEach((p: any) => {
+            docText += `:param ${p.name}: \n`;
+          });
+          docText += `:returns: \n"""\n`;
+        } else if (language === "typescript") {
+          docText = `/**\n`;
+          fn.params.forEach((p: any) => {
+            docText += ` * @param {${p.type || "any"}} ${p.name}\n`;
+          });
+          docText += ` * @returns {${fn.returnType || "void"}} \n */\n`;
+        } else {
+          docText = `/**\n`;
+          fn.params.forEach((p: any) => {
+            docText += ` * @param ${p.name}\n`;
+          });
+          docText += ` * @returns \n */\n`;
+        }
+        edits.insert(
+          document.uri,
+          new vscode.Position(currentLine, 0),
+          docText
+        );
+        history[uniqueKey] = true;
+        insertedCount++;
+      }
+      if (Object.keys(history).length) {
+        fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+      }
+      if (insertedCount > 0) {
         await vscode.workspace.applyEdit(edits);
         vscode.window.showInformationMessage("Inserted docs in file.");
       } else {
@@ -385,12 +323,47 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  const debugParserCommand = vscode.commands.registerCommand(
-    "autodocgen.debugParseCurrentFile",
-    debugParseCommand
-  );
 
-  context.subscriptions.push(scanCommand, scanSelection, debugParserCommand);
+  /** --- reset doc history for current file --- */
+  const resetDocHistoryCommand = vscode.commands.registerCommand(
+    "autodocgen.resetDocHistory",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const document = editor.document;
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+      if (!workspaceFolder) return;
+      const relativePath = path.relative(
+        workspaceFolder.uri.fsPath,
+        document.uri.fsPath
+      );
+      const historyPath = path.join(
+        workspaceFolder.uri.fsPath,
+        ".autodocgen",
+        "history",
+        `${relativePath}.json`
+      );
+      try {
+        if (fs.existsSync(historyPath)) {
+          fs.unlinkSync(historyPath);
+          vscode.window.showInformationMessage(
+            "Doc history reset for this file."
+          );
+        } else {
+          vscode.window.showInformationMessage(
+            "No doc history found for this file."
+          );
+        }
+      } catch (err) {
+        vscode.window.showErrorMessage("Failed to reset doc history: " + err);
+      }
+    }
+  );
+  context.subscriptions.push(
+    scanCommand,
+    scanSelection,
+    resetDocHistoryCommand
+  );
 }
 
 export function deactivate() {}
