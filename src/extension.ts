@@ -3,6 +3,23 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { parseFunctions } from "./parser";
+import { LocalModel } from "./types";
+import {
+  getAvailableModels,
+  isModelDownloaded,
+  syncAvailableModelsWithDefaults,
+  storeSelectedModel,
+} from "./core/modelManager";
+
+import { getStoredModel } from "./core/modelManager"; // Adjust path as needed
+import { isOllamaInstalled, promptInstallOllama } from "./core/ollamaUtils";
+import { runPromptCommand } from "./commands/runPromptCommand";
+
+export async function getSelectedModel(
+  context: vscode.ExtensionContext
+): Promise<LocalModel | undefined> {
+  return context.globalState.get<LocalModel>("selectedModel");
+}
 
 /**
  * Checks above a given line number if there is a real docblock.
@@ -39,9 +56,95 @@ function hasDocCommentAbove(doc: vscode.TextDocument, line: number): boolean {
   return false;
 }
 
+export async function selectModelCommand(context: vscode.ExtensionContext) {
+  const modelOptions = getAvailableModels();
 
-export function activate(context: vscode.ExtensionContext) {
-  /** --- full-file scan --- */
+  if (!modelOptions || modelOptions.length === 0) {
+    vscode.window.showErrorMessage(
+      "No models configured. Please check your settings."
+    );
+    return;
+  }
+
+  const selected = await vscode.window.showQuickPick(modelOptions, {
+    placeHolder: "Select a local LLM model to use for documentation generation",
+  });
+
+  if (!selected) {
+    vscode.window.showInformationMessage("Model selection cancelled.");
+    return;
+  }
+
+  const folders = await vscode.window.showOpenDialog({
+    canSelectFolders: true,
+    openLabel: "Select the folder where this model is stored",
+  });
+
+  if (!folders || folders.length === 0) {
+    vscode.window.showErrorMessage("You must select a valid model folder.");
+    return;
+  }
+
+  const modelData: LocalModel = {
+    name: selected.label,
+    value: selected.value,
+    path: folders[0].fsPath,
+    downloaded: true,
+  };
+
+  // Ensure Ollama is installed
+  if (!isOllamaInstalled()) {
+    await promptInstallOllama();
+    return;
+  }
+
+  // Check if the model is already downloaded
+  const modelExists = isModelDownloaded(modelData.value);
+  if (modelExists) {
+      vscode.window.showInformationMessage(
+        `You selected "${modelData.value}" Already downloaded.`
+      );
+  }
+  if (!modelExists) {
+    const proceed = await vscode.window.showInformationMessage(
+      `The model "${modelData.value}" is not currently downloaded. Do you want to download it now using Ollama?`,
+      "Yes",
+      "No"
+    );
+
+    if (proceed === "Yes") {
+      await downloadModel(modelData.value);
+    } else {
+      vscode.window.showWarningMessage(
+        `You selected "${modelData.value}" but it's not downloaded. Functionality may be limited.`
+      );
+    }
+  }
+
+  await storeSelectedModel(context, modelData);
+
+  vscode.window.showInformationMessage(
+    `Model "${modelData.value}" saved and will be used for future generation.`
+  );
+}
+
+export async function downloadModel(modelName: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const terminal = vscode.window.createTerminal({
+      name: `Ollama: Download ${modelName}`,
+    });
+    terminal.show(true);
+    terminal.sendText(`ollama pull ${modelName}`);
+    vscode.window.showInformationMessage(
+      `Started downloading model: ${modelName}. Check terminal for progress.`
+    );
+    resolve();
+  });
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  await syncAvailableModelsWithDefaults();
+
   const scanCommand = vscode.commands.registerCommand(
     "autodocgen.scanCurrentFile",
     async () => {
@@ -160,7 +263,6 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  /** --- selection-context scan --- */
   const scanSelection = vscode.commands.registerCommand(
     "autodocgen.documentSelection",
     async () => {
@@ -323,8 +425,6 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-
-  /** --- reset doc history for current file --- */
   const resetDocHistoryCommand = vscode.commands.registerCommand(
     "autodocgen.resetDocHistory",
     async () => {
@@ -359,10 +459,36 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }
   );
+
+  const selectModel = vscode.commands.registerCommand(
+    "autodocgen.selectModel",
+    () => selectModelCommand(context)
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("autodocgen.debugPrintModel", async () => {
+      const model = getStoredModel(context);
+      if (!model) {
+        vscode.window.showWarningMessage("No model has been selected yet.");
+      } else {
+        vscode.window.showInformationMessage(
+          `Stored Model: ${model.name} @ ${model.path}`
+        );
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("autodocgen.runPrompt", () =>
+      runPromptCommand(context)
+    )
+  );
+
   context.subscriptions.push(
     scanCommand,
     scanSelection,
-    resetDocHistoryCommand
+    resetDocHistoryCommand,
+    selectModel
   );
 }
 

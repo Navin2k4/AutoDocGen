@@ -7,3 +7,10 @@ export interface ParsedFunction {
   body: string;
   language: string;
 }
+
+export interface LocalModel {
+  name: string; 
+  value: string;
+  path: string; 
+  downloaded: boolean;
+}

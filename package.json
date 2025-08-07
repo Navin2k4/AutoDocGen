@@ -14,17 +14,28 @@
   "contributes": {
     "commands": [
       {
+        "command": "autodocgen.runPrompt",
+        "title": "AutoDocGen: Run Prompt with Model"
+      },
+      {
+        "command": "autodocgen.debugPrintModel",
+        "title": "AutoDocGen: Show Selected Model"
+      },
+      {
         "command": "autodocgen.scanCurrentFile",
         "title": "AutoDocGen: Document Current File"
       },
       {
         "command": "autodocgen.documentSelection",
-        "title": "AutoDocGen: Document Selected Function",
-        "category": "AutoDocGen"
+        "title": "AutoDocGen: Document Selected Function"
       },
       {
         "command": "autodocgen.resetDocHistory",
         "title": "AutoDocGen: Reset Doc History"
+      },
+      {
+        "command": "autodocgen.selectModel",
+        "title": "AutoDocGen: Select LLM Model"
       }
     ],
     "menus": {
@@ -44,15 +55,52 @@
           "default": true,
           "description": "Run documentation only via commands (disable autoscan)."
         },
-        "autodocgen.templateStyle": {
+        "autodocgen.availableModels": {
+          "type": "array",
+          "description": "List of available local LLM models for documentation generation.",
+          "default": [
+            {
+              "name": "deepseek-coder:1.3b",
+              "value": "deepseek-coder:1.3b",
+              "size": "1.9 GB",
+              "performance": "Good performance"
+            },
+            {
+              "name": "phi:2.7b",
+              "value": "phi:2.7b",
+              "size": "2.1 GB",
+              "performance": "Excellent code quality"
+            },
+            {
+              "name": "mistral:7b",
+              "value": "mistral:7b",
+              "size": "4.2 GB",
+              "performance": "High-quality reasoning"
+            },
+            {
+              "name": "codellama:7b",
+              "value": "codellama:7b",
+              "size": "4 GB",
+              "performance": "Best for large context code"
+            }
+          ]
+        },
+        "autodocgen.model": {
           "type": "string",
-          "default": "jsdoc",
+          "default": "deepseek-coder",
+          "description": "Select the local LLM to generate documentation. These models run via Ollama and are downloaded/stored locally. Ensure you have sufficient disk space (minimum ~4 GB).",
           "enum": [
-            "jsdoc",
-            "google",
-            "numpy"
+            "deepseek-coder",
+            "codellama",
+            "phi3",
+            "starcoder2"
           ],
-          "description": "Docstring template style to insert."
+          "enumDescriptions": [
+            "DeepSeek-Coder (6.7B) – ~13 GB – High accuracy on complex code; best for JavaScript, Python, Java.",
+            "Code Llama (7B) – ~13 GB – Fast, well-balanced model from Meta, good multi-language support.",
+            "Phi-3 Mini (3.8B) – ~4 GB – Small and fast; decent performance for lightweight tasks.",
+            "StarCoder2 (3B) – ~4 GB – Moderate quality; small size; multilingual code support."
+          ]
         },
         "autodocgen.overwriteExistingDocs": {
           "type": "boolean",
@@ -70,7 +118,8 @@
             "python",
             "java"
           ],
-          "description": "Languages that AutoDocGen will process during scans."
+          "scope": "machine",
+          "description": "Languages supported by AutoDocGen. This setting is read-only and cannot be modified."
         }
       }
     }
