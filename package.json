@@ -24,46 +24,83 @@
       {
         "command": "autodocgen.scanProject",
         "title": "AutoDocGen: Document Entire Project"
+      },
+      {
+        "command": "autodocgen.documentSelection",
+        "title": "AutoDocGen: Document Selected Function",
+        "category": "AutoDocGen"
+      },
+      {
+        "command": "autodocgen.debugParseCurrentFile",
+        "title": "AutoDocGen: Debug Parse Current File"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "autodocgen.documentSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@6"
+        }
+      ]
+    },
     "configuration": {
       "title": "AutoDocGen Settings",
       "properties": {
         "autodocgen.manualMode": {
           "type": "boolean",
           "default": true,
-          "description": "If true, document generation runs only via command. Disable to allow automatic processing on file save."
+          "description": "Run documentation only via commands (disable autoscan)."
         },
-        "autodocgen.selectedModel": {
+        "autodocgen.templateStyle": {
           "type": "string",
-          "default": "codellama:7b",
+          "default": "jsdoc",
           "enum": [
-            "codellama:7b",
-            "deepseek-coder:1.3b",
-            "mistral:7b"
+            "jsdoc",
+            "google",
+            "numpy"
           ],
-          "description": "Local LLM model to use for documentation generation (via Ollama)."
+          "description": "Docstring template style to insert."
+        },
+        "autodocgen.overwriteExistingDocs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Overwrite any existing documentation blocks rather than skipping."
+        },
+        "autodocgen.supportedLanguages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "javascript",
+            "typescript",
+            "python",
+            "java"
+          ],
+          "description": "Languages that AutoDocGen will process during scans."
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc && cpx \"src/core/python_parser.py\" \"out/core\"",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.102.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.102.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "eslint": "^9.25.1",
-    "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "cpx": "^1.5.0",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3"
   }
 }
