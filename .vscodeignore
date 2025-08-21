@@ -10,18 +10,3 @@ vsc-extension-quickstart.md
 **/*.ts
 **/.vscode-test.*
 .env
-
-# Exclude tests
-out/test/**
-test/**
-**/*.spec.*
-
-# Exclude build tools
-scripts/**
-node_modules/**
-
-# Keep only production build
-!out/**
-!node_modules/node-fetch/**
-!node_modules/@babel/generator/**
-!node_modules/@babel/traverse/**
