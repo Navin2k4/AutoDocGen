@@ -80,7 +80,7 @@ export async function runPromptCommand(context: vscode.ExtensionContext) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
+          model: `${groqModel}`,
           messages: [
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: prompt },
