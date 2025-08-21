@@ -3,6 +3,10 @@
   "displayName": "AutoDocGen – Intelligent Code Documentation",
   "description": "A modular plugin for automatically generating inline function documentation in source code using local large language models.",
   "version": "0.0.1",
+  "publisher": "navinkumaran2004",
+  "repository": {
+    "url": "https://github.com/Navin2k4/AutoDocGen"
+  },
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -14,56 +18,201 @@
   "contributes": {
     "commands": [
       {
-        "command": "autodocgen.activate",
-        "title": "AutoDocGen: Activate"
+        "command": "autodocgen.runPrompt",
+        "title": "AutoDocGen: Run Prompt with Model"
+      },
+      {
+        "command": "autodocgen.debugPrintModel",
+        "title": "AutoDocGen: Show Selected Model"
       },
       {
         "command": "autodocgen.scanCurrentFile",
         "title": "AutoDocGen: Document Current File"
       },
       {
-        "command": "autodocgen.scanProject",
-        "title": "AutoDocGen: Document Entire Project"
+        "command": "autodocgen.documentSelection",
+        "title": "AutoDocGen: Document Selected Function"
+      },
+      {
+        "command": "autodocgen.resetDocHistory",
+        "title": "AutoDocGen: Reset Doc History"
+      },
+      {
+        "command": "autodocgen.selectModel",
+        "title": "AutoDocGen: Select LLM Model"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "autodocgen.documentSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@6"
+        }
+      ]
+    },
     "configuration": {
       "title": "AutoDocGen Settings",
       "properties": {
         "autodocgen.manualMode": {
           "type": "boolean",
           "default": true,
-          "description": "If true, document generation runs only via command. Disable to allow automatic processing on file save."
+          "description": "Run documentation only via commands (disable autoscan).",
+          "markdownDescription": "If enabled, AutoDocGen generates documentation only when you run commands like `AutoDocGen: Document Current File` or `AutoDocGen: Document Selected Function`. No automatic scanning occurs."
         },
-        "autodocgen.selectedModel": {
+        "autodocgen.groqApiKey": {
           "type": "string",
-          "default": "codellama:7b",
+          "default": "",
+          "description": "Your Groq API key used for cloud-based LLM documentation generation.",
+          "markdownDescription": "Your Groq API key used for cloud-based LLM documentation generation when `autodocgen.generationMode` is set to `cloud`. You can create or view your keys at [Groq Console](https://console.groq.com/keys)."
+        },
+        "autodocgen.groqModel": {
+          "type": "string",
+          "default": "",
+          "description": "Groq model to use for cloud generation.",
+          "markdownDescription": "Groq model to use for cloud generation when `autodocgen.generationMode` is `cloud`. See the [Groq model catalog](https://console.groq.com/docs/models) for available models."
+        },
+        "autodocgen.generationMode": {
+          "type": "string",
+          "default": "ask",
           "enum": [
-            "codellama:7b",
-            "deepseek-coder:1.3b",
-            "mistral:7b"
+            "cloud",
+            "local",
+            "ask"
           ],
-          "description": "Local LLM model to use for documentation generation (via Ollama)."
+          "enumDescriptions": [
+            "Use Groq API for generation",
+            "Use local Ollama model for generation",
+            "Ask each time you run a scan"
+          ],
+          "description": "Choose how docs are generated: cloud (Groq), local (Ollama), or ask per scan.",
+          "markdownDescription": "Controls how documentation is generated.\n\n- `cloud`: Use Groq with your `autodocgen.groqApiKey` and `autodocgen.groqModel`.\n- `local`: Use a local model via Ollama. You select the model using the `AutoDocGen: Select LLM Model` command. Requires [Ollama](https://ollama.com/download).\n- `ask`: You will be prompted to choose `Cloud (Groq)` or `Local (Ollama)` each time you run a scan."
+        },
+        "autodocgen.availableModels": {
+          "type": "array",
+          "description": "List of available local LLM models for documentation generation.",
+          "markdownDescription": "List of local LLM options shown in the `AutoDocGen: Select LLM Model` picker. Editing this changes what appears in the selection UI only. The actual selected model is stored per-user when you use the command.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Human-readable model name (shown in the picker)."
+              },
+              "value": {
+                "type": "string",
+                "description": "The Ollama model tag used for generation (e.g. `mistral:7b`)."
+              },
+              "size": {
+                "type": "string",
+                "description": "Approximate download size for the model."
+              },
+              "performance": {
+                "type": "string",
+                "description": "Short note about model characteristics."
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ]
+          },
+          "default": [
+            {
+              "name": "deepseek-coder:1.3b",
+              "value": "deepseek-coder:1.3b",
+              "size": "1.9 GB",
+              "performance": "Good performance"
+            },
+            {
+              "name": "phi:2.7b",
+              "value": "phi:2.7b",
+              "size": "2.1 GB",
+              "performance": "Excellent code quality"
+            },
+            {
+              "name": "mistral:7b",
+              "value": "mistral:7b",
+              "size": "4.2 GB",
+              "performance": "High-quality reasoning"
+            },
+            {
+              "name": "codellama:7b",
+              "value": "codellama:7b",
+              "size": "4 GB",
+              "performance": "Best for large context code"
+            }
+          ]
+        },
+        "autodocgen.model": {
+          "type": "string",
+          "default": "deepseek-coder",
+          "description": "Select the local LLM to generate documentation (deprecated).",
+          "markdownDescription": "Deprecated. Use the `AutoDocGen: Select LLM Model` command to choose a model for local generation instead. The selected model is stored per-user and used when `autodocgen.generationMode` is `local`.",
+          "deprecationMessage": "This setting is no longer used by AutoDocGen. Use the 'AutoDocGen: Select LLM Model' command instead.",
+          "enum": [
+            "deepseek-coder",
+            "codellama",
+            "phi3",
+            "starcoder2"
+          ],
+          "enumDescriptions": [
+            "DeepSeek-Coder (6.7B) – ~13 GB – High accuracy on complex code; best for JavaScript, Python, Java.",
+            "Code Llama (7B) – ~13 GB – Fast, well-balanced model from Meta, good multi-language support.",
+            "Phi-3 Mini (3.8B) – ~4 GB – Small and fast; decent performance for lightweight tasks.",
+            "StarCoder2 (3B) – ~4 GB – Moderate quality; small size; multilingual code support."
+          ]
+        },
+        "autodocgen.overwriteExistingDocs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Overwrite any existing documentation blocks rather than skipping.",
+          "markdownDescription": "If enabled, AutoDocGen will overwrite existing documentation blocks instead of skipping documented functions. Note: Behavior may be limited in this release."
+        },
+        "autodocgen.supportedLanguages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "javascript",
+            "typescript",
+            "python",
+            "java"
+          ],
+          "scope": "machine",
+          "description": "Languages supported by AutoDocGen. This setting is read-only and cannot be modified.",
+          "markdownDescription": "Languages supported by AutoDocGen for function detection and documentation generation. This list is informative and cannot be modified."
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc && node out/scripts/copyNonTSFiles.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.102.0",
+    "@babel/parser": "^7.28.0",
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__traverse": "^7.28.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.102.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "eslint": "^9.25.1",
-    "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "cpx": "^1.5.0",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.28.0",
+    "@babel/traverse": "^7.28.0",
+    "node-fetch": "^3.3.2"
   }
 }
