@@ -7,6 +7,18 @@
   "repository": {
     "url": "https://github.com/Navin2k4/AutoDocGen"
   },
+  "galleryBanner": {
+    "color": "#1e90ff",
+    "theme": "dark"
+  },
+  "keywords": [
+    "documentation",
+    "LLM",
+    "autodoc",
+    "AI",
+    "comment generator"
+  ],
+  "icon": "autodocgen.png",
   "engines": {
     "vscode": "^1.102.0"
   },
