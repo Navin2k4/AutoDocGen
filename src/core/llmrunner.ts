@@ -4,45 +4,35 @@ import { LocalModel } from "../types";
 /**
  * Runs the given prompt through the local LLM using Ollama and streams output.
  */
-export function runModelWithPrompt(
+export async function runModelWithPromptStream(
   model: LocalModel,
-  prompt: string
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const command = "ollama";
-    const args = ["run", model.name, `"${prompt}"`];
-
-    console.log("[AutoDocGen] Spawning command:", command, args.join(" "));
-    const child = spawn(command, args, {
-      cwd: model.path,
-      shell: true, // Needed for Windows environments
-    });
-
-    let output = "";
-    let errorOutput = "";
-
-    child.stdout.on("data", (data) => {
-      const out = data.toString();
-      console.log("[AutoDocGen][stdout]", out);
-      output += out;
-    });
-
-    child.stderr.on("data", (data) => {
-      const err = data.toString();
-      console.error("[AutoDocGen][stderr]", err);
-      errorOutput += err;
-    });
-
-    child.on("close", (code) => {
-      if (code !== 0) {
-        reject(`LLM process exited with code ${code}: ${errorOutput}`);
-      } else {
-        resolve(output.trim());
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(`Failed to start LLM process: ${err.message}`);
-    });
+  prompt: string,
+  onData: (chunk: string) => void
+): Promise<void> {
+  const res = await fetch("http://localhost:11434/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: model.name,
+      prompt,
+      stream: true,
+    }),
   });
+
+  if (!res.body) throw new Error("No response body from Ollama");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    const text = decoder.decode(value);
+    for (const line of text.trim().split("\n")) {
+      if (!line) continue;
+      const json = JSON.parse(line);
+      if (json.response) onData(json.response);
+    }
+  }
 }

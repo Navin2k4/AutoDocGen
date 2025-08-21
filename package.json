@@ -3,6 +3,10 @@
   "displayName": "AutoDocGen – Intelligent Code Documentation",
   "description": "A modular plugin for automatically generating inline function documentation in source code using local large language models.",
   "version": "0.0.1",
+  "publisher": "navinkumaran2004",
+  "repository": {
+    "url": "https://github.com/Navin2k4/AutoDocGen"
+  },
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -53,11 +57,66 @@
         "autodocgen.manualMode": {
           "type": "boolean",
           "default": true,
-          "description": "Run documentation only via commands (disable autoscan)."
+          "description": "Run documentation only via commands (disable autoscan).",
+          "markdownDescription": "If enabled, AutoDocGen generates documentation only when you run commands like `AutoDocGen: Document Current File` or `AutoDocGen: Document Selected Function`. No automatic scanning occurs."
+        },
+        "autodocgen.groqApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Groq API key used for cloud-based LLM documentation generation.",
+          "markdownDescription": "Your Groq API key used for cloud-based LLM documentation generation when `autodocgen.generationMode` is set to `cloud`. You can create or view your keys at [Groq Console](https://console.groq.com/keys)."
+        },
+        "autodocgen.groqModel": {
+          "type": "string",
+          "default": "",
+          "description": "Groq model to use for cloud generation.",
+          "markdownDescription": "Groq model to use for cloud generation when `autodocgen.generationMode` is `cloud`. See the [Groq model catalog](https://console.groq.com/docs/models) for available models."
+        },
+        "autodocgen.generationMode": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "cloud",
+            "local",
+            "ask"
+          ],
+          "enumDescriptions": [
+            "Use Groq API for generation",
+            "Use local Ollama model for generation",
+            "Ask each time you run a scan"
+          ],
+          "description": "Choose how docs are generated: cloud (Groq), local (Ollama), or ask per scan.",
+          "markdownDescription": "Controls how documentation is generated.\n\n- `cloud`: Use Groq with your `autodocgen.groqApiKey` and `autodocgen.groqModel`.\n- `local`: Use a local model via Ollama. You select the model using the `AutoDocGen: Select LLM Model` command. Requires [Ollama](https://ollama.com/download).\n- `ask`: You will be prompted to choose `Cloud (Groq)` or `Local (Ollama)` each time you run a scan."
         },
         "autodocgen.availableModels": {
           "type": "array",
           "description": "List of available local LLM models for documentation generation.",
+          "markdownDescription": "List of local LLM options shown in the `AutoDocGen: Select LLM Model` picker. Editing this changes what appears in the selection UI only. The actual selected model is stored per-user when you use the command.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Human-readable model name (shown in the picker)."
+              },
+              "value": {
+                "type": "string",
+                "description": "The Ollama model tag used for generation (e.g. `mistral:7b`)."
+              },
+              "size": {
+                "type": "string",
+                "description": "Approximate download size for the model."
+              },
+              "performance": {
+                "type": "string",
+                "description": "Short note about model characteristics."
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ]
+          },
           "default": [
             {
               "name": "deepseek-coder:1.3b",
@@ -88,7 +147,9 @@
         "autodocgen.model": {
           "type": "string",
           "default": "deepseek-coder",
-          "description": "Select the local LLM to generate documentation. These models run via Ollama and are downloaded/stored locally. Ensure you have sufficient disk space (minimum ~4 GB).",
+          "description": "Select the local LLM to generate documentation (deprecated).",
+          "markdownDescription": "Deprecated. Use the `AutoDocGen: Select LLM Model` command to choose a model for local generation instead. The selected model is stored per-user and used when `autodocgen.generationMode` is `local`.",
+          "deprecationMessage": "This setting is no longer used by AutoDocGen. Use the 'AutoDocGen: Select LLM Model' command instead.",
           "enum": [
             "deepseek-coder",
             "codellama",
@@ -105,7 +166,8 @@
         "autodocgen.overwriteExistingDocs": {
           "type": "boolean",
           "default": false,
-          "description": "Overwrite any existing documentation blocks rather than skipping."
+          "description": "Overwrite any existing documentation blocks rather than skipping.",
+          "markdownDescription": "If enabled, AutoDocGen will overwrite existing documentation blocks instead of skipping documented functions. Note: Behavior may be limited in this release."
         },
         "autodocgen.supportedLanguages": {
           "type": "array",
@@ -119,7 +181,8 @@
             "java"
           ],
           "scope": "machine",
-          "description": "Languages supported by AutoDocGen. This setting is read-only and cannot be modified."
+          "description": "Languages supported by AutoDocGen. This setting is read-only and cannot be modified.",
+          "markdownDescription": "Languages supported by AutoDocGen for function detection and documentation generation. This list is informative and cannot be modified."
         }
       }
     }
@@ -149,6 +212,7 @@
   },
   "dependencies": {
     "@babel/generator": "^7.28.0",
-    "@babel/traverse": "^7.28.0"
+    "@babel/traverse": "^7.28.0",
+    "node-fetch": "^3.3.2"
   }
 }

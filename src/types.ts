@@ -14,3 +14,14 @@ export interface LocalModel {
   path: string; 
   downloaded: boolean;
 }
+
+export interface ChatCompletionResponse {
+  choices: {
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }[];
+}

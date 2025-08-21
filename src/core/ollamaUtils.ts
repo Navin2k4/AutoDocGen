@@ -10,6 +10,15 @@ export function isOllamaInstalled(): boolean {
   }
 }
 
+async function isOllamaRunning(): Promise<boolean> {
+  try {
+    const res = await fetch("http://localhost:11434/api/tags");
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function promptInstallOllama() {
   const action = await vscode.window.showErrorMessage(
     "Ollama is not installed. You need it to run local LLM models.",

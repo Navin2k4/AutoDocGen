@@ -64,6 +64,8 @@ export async function parseJSTSWithAST(
   };
 
   const handleFunctionNode = (node: any, name: string) => {
+    if (!name || name === "anonymous") return;
+
     const params = extractParams(node.params);
     let returnType;
     const typeNode = node.returnType?.typeAnnotation;

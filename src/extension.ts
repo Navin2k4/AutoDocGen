@@ -11,9 +11,13 @@ import {
   storeSelectedModel,
 } from "./core/modelManager";
 
-import { getStoredModel } from "./core/modelManager"; // Adjust path as needed
+import { getStoredModel } from "./core/modelManager";
 import { isOllamaInstalled, promptInstallOllama } from "./core/ollamaUtils";
 import { runPromptCommand } from "./commands/runPromptCommand";
+import {
+  generateDocFromGroq,
+  generateDocFromLocalModel,
+} from "./core/llmservice";
 
 export async function getSelectedModel(
   context: vscode.ExtensionContext
@@ -101,9 +105,9 @@ export async function selectModelCommand(context: vscode.ExtensionContext) {
   // Check if the model is already downloaded
   const modelExists = isModelDownloaded(modelData.value);
   if (modelExists) {
-      vscode.window.showInformationMessage(
-        `You selected "${modelData.value}" Already downloaded.`
-      );
+    vscode.window.showInformationMessage(
+      `You selected "${modelData.value}" Already downloaded.`
+    );
   }
   if (!modelExists) {
     const proceed = await vscode.window.showInformationMessage(
@@ -179,7 +183,65 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       }
 
-      // Use the new parser for all languages
+      // Determine generation mode (cloud/local/ask)
+      const config = vscode.workspace.getConfiguration("autodocgen");
+      let generationMode = config.get<string>("generationMode", "ask");
+
+      if (generationMode === "ask") {
+        const choice = await vscode.window.showQuickPick(
+          [
+            { label: "Cloud (Groq)", value: "cloud" },
+            { label: "Local (Ollama)", value: "local" },
+          ],
+          { placeHolder: "Choose how to generate documentation for this scan" }
+        );
+        if (!choice) {
+          vscode.window.showInformationMessage("Documentation scan cancelled.");
+          return;
+        }
+        generationMode = choice.value;
+      }
+
+      // Resolve local model if needed
+      let selectedLocalModel: LocalModel | undefined;
+      if (generationMode === "local") {
+        // Ensure Ollama is installed
+        if (!isOllamaInstalled()) {
+          await promptInstallOllama();
+          return;
+        }
+
+        selectedLocalModel = getStoredModel(context);
+        if (!selectedLocalModel) {
+          await selectModelCommand(context);
+          selectedLocalModel = getStoredModel(context);
+        }
+        if (!selectedLocalModel) {
+          vscode.window.showWarningMessage(
+            "No local model selected. Please select a model and try again."
+          );
+          return;
+        }
+
+        const exists = isModelDownloaded(selectedLocalModel.value);
+        if (!exists) {
+          const proceed = await vscode.window.showInformationMessage(
+            `The model "${selectedLocalModel.value}" is not downloaded. Download now via Ollama?`,
+            "Yes",
+            "No"
+          );
+          if (proceed === "Yes") {
+            await downloadModel(selectedLocalModel.value);
+          } else {
+            vscode.window.showWarningMessage(
+              `Selected local model "${selectedLocalModel.value}" is not available. Aborting.`
+            );
+            return;
+          }
+        }
+      }
+
+      // Parse functions
       let parsedFuncs: any[] = [];
       try {
         parsedFuncs = await parseFunctions(text, language);
@@ -191,8 +253,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
       const edits = new vscode.WorkspaceEdit();
       let insertedCount = 0;
+
       for (const fn of parsedFuncs) {
-        // For Python, startIndex/endIndex are line numbers (1-based), for others, they are character indices
         let currentLine: number;
         if (language === "python") {
           currentLine =
@@ -209,10 +271,12 @@ export async function activate(context: vscode.ExtensionContext) {
           );
           continue;
         }
+
         const fullBody = fn.body.replace(/\s+/g, " ");
         const hash = crypto.createHash("md5").update(fullBody).digest("hex");
         const uniqueKey = `${relativePath}::${language}::${hash}`;
         const hasDoc = hasDocCommentAbove(document, currentLine);
+
         if (hasDoc) {
           history[uniqueKey] = true;
           continue;
@@ -220,44 +284,38 @@ export async function activate(context: vscode.ExtensionContext) {
         if (history[uniqueKey]) {
           delete history[uniqueKey];
         }
-        // Build doc
-        let docText = "";
-        if (language === "python") {
-          docText = `"""\n`;
-          fn.params.forEach((p: any) => {
-            docText += `:param ${p.name}: \n`;
-          });
-          docText += `:returns: \n"""\n`;
-        } else if (language === "typescript") {
-          docText = `/**\n`;
-          fn.params.forEach((p: any) => {
-            docText += ` * @param {${p.type || "any"}} ${p.name}\n`;
-          });
-          docText += ` * @returns {${fn.returnType || "void"}} \n */\n`;
-        } else {
-          docText = `/**\n`;
-          fn.params.forEach((p: any) => {
-            docText += ` * @param ${p.name}\n`;
-          });
-          docText += ` * @returns \n */\n`;
-        }
+
+        const docText =
+          generationMode === "local" && selectedLocalModel
+            ? await generateDocFromLocalModel(
+                fn.body,
+                language,
+                selectedLocalModel.value
+              )
+            : await generateDocFromGroq(fn.body, language);
+        if (!docText) continue;
+
         edits.insert(
           document.uri,
           new vscode.Position(currentLine, 0),
-          docText
+          docText + "\n"
         );
         history[uniqueKey] = true;
         insertedCount++;
       }
+
       if (Object.keys(history).length) {
         fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
       }
+
       if (insertedCount > 0) {
         await vscode.workspace.applyEdit(edits);
-        vscode.window.showInformationMessage("Inserted docs in file.");
+        vscode.window.showInformationMessage(
+          "Inserted AI-generated docs in file."
+        );
       } else {
         vscode.window.showInformationMessage(
-          "All functions in file already documented."
+          "All functions already documented."
         );
       }
     }
@@ -320,6 +378,68 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       }
 
+      // Determine generation mode (cloud/local/ask)
+      const config = vscode.workspace.getConfiguration("autodocgen");
+      let generationMode = config.get<string>("generationMode", "ask");
+
+      if (generationMode === "ask") {
+        const choice = await vscode.window.showQuickPick(
+          [
+            { label: "Cloud (Groq)", value: "cloud" },
+            { label: "Local (Ollama)", value: "local" },
+          ],
+          {
+            placeHolder:
+              "Choose how to generate documentation for this selection",
+          }
+        );
+        if (!choice) {
+          vscode.window.showInformationMessage(
+            "Documentation generation cancelled."
+          );
+          return;
+        }
+        generationMode = choice.value;
+      }
+
+      // Resolve local model if needed
+      let selectedLocalModel: LocalModel | undefined;
+      if (generationMode === "local") {
+        if (!isOllamaInstalled()) {
+          await promptInstallOllama();
+          return;
+        }
+
+        selectedLocalModel = getStoredModel(context);
+        if (!selectedLocalModel) {
+          await selectModelCommand(context);
+          selectedLocalModel = getStoredModel(context);
+        }
+        if (!selectedLocalModel) {
+          vscode.window.showWarningMessage(
+            "No local model selected. Please select a model and try again."
+          );
+          return;
+        }
+
+        const exists = isModelDownloaded(selectedLocalModel.value);
+        if (!exists) {
+          const proceed = await vscode.window.showInformationMessage(
+            `The model "${selectedLocalModel.value}" is not downloaded. Download now via Ollama?`,
+            "Yes",
+            "No"
+          );
+          if (proceed === "Yes") {
+            await downloadModel(selectedLocalModel.value);
+          } else {
+            vscode.window.showWarningMessage(
+              `Selected local model "${selectedLocalModel.value}" is not available. Aborting.`
+            );
+            return;
+          }
+        }
+      }
+
       let match;
       let foundOne = false;
       const edits = new vscode.WorkspaceEdit();
@@ -367,34 +487,17 @@ export async function activate(context: vscode.ExtensionContext) {
           delete history[uniqueKey];
         }
 
-        // Build doc exactly like in file scan
-        let docText = "";
-        if (language === "python") {
-          docText = `"""\n`;
-          params.forEach((p) => {
-            const name = p.split(":")[0].trim();
-            docText += `:param ${name}: \n`;
-          });
-          docText += `:returns: \n"""\n`;
-        } else if (language === "typescript") {
-          docText = `/**\n`;
-          params.forEach((p) => {
-            const [name, type] = p.split(":").map((s) => s.trim());
-            docText += ` * @param {${type || "any"}} ${name}\n`;
-          });
-          const ret = text
-            .substring(startIndex)
-            .match(/\)\s*:\s*([\w<>\[\]]+)\s*(?:{|=>)/);
-          const returnType = ret ? ret[1] : "void";
-          docText += ` * @returns {${returnType}} \n */\n`;
-        } else {
-          docText = `/**\n`;
-          params.forEach((p) => {
-            const name = p.split(":")[0].trim();
-            docText += ` * @param ${name}\n`;
-          });
-          docText += ` * @returns \n */\n`;
-        }
+        // Build doc via configured generator
+        const snippetBody = text.substring(startIndex, endIndex + 1);
+        const docText =
+          generationMode === "local" && selectedLocalModel
+            ? await generateDocFromLocalModel(
+                snippetBody,
+                language,
+                selectedLocalModel.value
+              )
+            : await generateDocFromGroq(snippetBody, language);
+        if (!docText) break;
         edits.insert(
           document.uri,
           new vscode.Position(currentLine, 0),

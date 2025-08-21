@@ -1,47 +1,107 @@
 import * as vscode from "vscode";
-import { getStoredModel, validateModelPath } from "../core/modelManager";
-import { runModelWithPrompt } from "../core/llmrunner";
-import * as path from "path";
-import * as fs from "fs/promises";
+
+interface ChatCompletionResponse {
+  choices: {
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }[];
+}
 
 export async function runPromptCommand(context: vscode.ExtensionContext) {
-  const model = getStoredModel(context);
-
-  if (!model) {
-    vscode.window.showErrorMessage(
-      "No model selected. Please select a model first."
-    );
-    return;
-  }
-
-  if (!validateModelPath(model)) {
-    vscode.window.showErrorMessage("Stored model path is invalid.");
-    return;
-  }
-
   const prompt = await vscode.window.showInputBox({
-    prompt: "Enter a prompt to run with the selected model",
+    prompt: "Enter a prompt to run with Groq API",
     placeHolder: "e.g., Generate documentation for this function...",
   });
 
   if (!prompt) return;
 
   try {
-    const result = await runModelWithPrompt(model, prompt);
-    console.log("[AutoDocGen] Received output from model:", result);
-    // Get workspace folder or fallback to home dir
-    const folders = vscode.workspace.workspaceFolders;
-    const baseDir =
-      folders && folders.length > 0
-        ? folders[0].uri.fsPath
-        : require("os").homedir();
+    const outputChannel = vscode.window.createOutputChannel("AutoDocGen");
+    outputChannel.show(true);
 
-    // Create markdown file path
-    const fileName = `autodocgen-output-${Date.now()}.md`;
-    const filePath = path.join(baseDir, fileName);
-    console.log("[AutoDocGen] Writing to file:", filePath);
-    vscode.window.showInformationMessage("Processed");
-  } catch (err: any) {
-    vscode.window.showErrorMessage(err.toString());
+    const config = vscode.workspace.getConfiguration("autodocgen");
+    let apiKey = config.get<string>("groqApiKey");
+    let groqModel = config.get<string>("groqModel");
+
+    if (!apiKey) {
+      vscode.window
+        .showErrorMessage(
+          "Missing or invalid Groq API key. Please set it in AutoDocGen Settings or in your environment variables.",
+          "Open Settings",
+          "Get API Key"
+        )
+        .then((selection) => {
+          if (selection === "Open Settings") {
+            vscode.commands.executeCommand(
+              "workbench.action.openSettings",
+              "@ext:autodocgen"
+            );
+          } else if (selection === "Get API Key") {
+            vscode.env.openExternal(
+              vscode.Uri.parse("https://console.groq.com/keys")
+            );
+          }
+        });
+      return;
+    }
+
+    if (!groqModel) {
+      vscode.window
+        .showErrorMessage(
+          "Missing or invalid Groq Model. Please set it in AutoDocGen Settings or in your environment variables.",
+          "Open Settings",
+          "Get Model"
+        )
+        .then((selection) => {
+          if (selection === "Open Settings") {
+            vscode.commands.executeCommand(
+              "workbench.action.openSettings",
+              "@ext:autodocgen"
+            );
+          } else if (selection === "Get Model") {
+            vscode.env.openExternal(
+              vscode.Uri.parse("https://console.groq.com/docs/models")
+            );
+          }
+        });
+      return;
+    }
+
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: prompt },
+          ],
+          stream: false,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Groq API error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = (await response.json()) as ChatCompletionResponse;
+    const content = data.choices?.[0]?.message?.content ?? "[No response]";
+
+    outputChannel.appendLine(content);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    vscode.window.showErrorMessage(message);
   }
 }
