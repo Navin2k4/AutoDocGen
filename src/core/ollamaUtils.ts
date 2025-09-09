@@ -1,18 +1,26 @@
 import * as cp from "child_process";
 import * as vscode from "vscode";
 
+let ollamaProcess: cp.ChildProcess | null = null;
+let outputChannel: vscode.OutputChannel | null = null;
+
 export function isOllamaInstalled(): boolean {
   try {
     cp.execSync("ollama --version", { stdio: "ignore" });
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-async function isOllamaRunning(): Promise<boolean> {
+async function doFetch(url: string) {
+  const fetch = (await import("node-fetch")).default;
+  return fetch(url);
+}
+
+export async function isOllamaRunning(): Promise<boolean> {
   try {
-    const res = await fetch("http://localhost:11434/api/tags");
+    const res = await doFetch("http://localhost:11434/api/tags");
     return res.ok;
   } catch {
     return false;

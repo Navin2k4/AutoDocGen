@@ -27,6 +27,14 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "activationEvents": [
+      "onCommand:autodocgen.scanCurrentFile",
+      "onCommand:autodocgen.documentSelection",
+      "onCommand:autodocgen.resetDocHistory",
+      "onCommand:autodocgen.selectModel",
+      "onCommand:autodocgen.runPrompt",
+      "onCommand:autodocgen.debugPrintModel"
+    ],
     "commands": [
       {
         "command": "autodocgen.runPrompt",

@@ -1,0 +1,49 @@
+{
+    "dataset": [
+        {
+            "reference": "Splits an array into smaller arrays of a specified size.",
+            "candidate": "Splits an array into chunks of a given size.\n\n@param {any[]} arr - The input array.\n@param {number} size - The size of each chunk.\n@returns {any[][]} An array of arrays containing the chunked elements.\nExample: chunk([1,2,3,4], 2) => [[1,2],[3,4]]",
+            "source_code": "function chunk(arr, size) {\n  const res = [];\n  for (let i = 0; i < arr.length; i += size) {\n    res.push(arr.slice(i, i + size));\n  }\n  return res;\n}"
+        },
+        {
+            "reference": "Delays execution for a specified number of milliseconds.",
+            "candidate": "Pauses execution asynchronously for a given time.\n\n@param {number} ms - The delay in milliseconds.\n@returns {Promise<void>} A promise that resolves after the delay.\nExample: await sleep(1000) // waits 1 second",
+            "source_code": "function sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}"
+        },
+        {
+            "reference": "Converts an object of key-value pairs into a URL query string.",
+            "candidate": "Transforms an object into a URL-encoded query string.\n\n@param {Object} params - The object containing query parameters.\n@returns {string} The URL-encoded query string.\nExample: toQueryString({a:1,b:2}) => 'a=1&b=2'",
+            "source_code": "function toQueryString(params) {\n  return Object.entries(params)\n    .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))\n    .join('&');\n}"
+        },
+        {
+            "reference": "Finds the common elements between two arrays.",
+            "candidate": "Returns the intersection of two arrays.\n\n@param {any[]} a - The first array.\n@param {any[]} b - The second array.\n@returns {any[]} An array containing elements present in both input arrays.\nExample: intersect([1,2,3],[2,3,4]) => [2,3]",
+            "source_code": "function intersect(a, b) {\n  const setB = new Set(b);\n  return a.filter((x) => setB.has(x));\n}"
+        },
+        {
+            "reference": "Calculates the factorial of a non-negative integer.",
+            "candidate": "Computes the factorial of a given non-negative integer.\n\n@param {number} n - The input integer.\n@returns {number} The factorial of n.\nExample: factorial(5) => 120",
+            "source_code": "function factorial(n) {\n  if (n < 0) throw new Error('Negative numbers not allowed');\n  let res = 1;\n  for (let i = 2; i <= n; i++) res *= i;\n  return res;\n}"
+        },
+        {
+            "reference": "Removes all falsy values from an array.",
+            "candidate": "Filters out falsy values from an array.\n\n@param {any[]} arr - The input array.\n@returns {any[]} A new array containing only truthy values.\nExample: compact([0,1,false,2,'']) => [1,2]",
+            "source_code": "function compact(arr) {\n  return arr.filter(Boolean);\n}"
+        },
+        {
+            "reference": "Finds the maximum value in an array of numbers.",
+            "candidate": "Returns the largest number from an array.\n\n@param {number[]} arr - The array of numbers.\n@returns {number} The maximum value.\nExample: findMax([1,5,3]) => 5",
+            "source_code": "function findMax(arr) {\n  return Math.max(...arr);\n}"
+        },
+        {
+            "reference": "Generates the nth row of Pascal's triangle.",
+            "candidate": "Generates a specific row of Pascal's triangle.\n\n@param {number} n - The index of the row (0-based).\n@returns {number[]} The nth row of Pascal's triangle.\nExample: pascalRow(3) => [1,3,3,1]",
+            "source_code": "function pascalRow(n) {\n  const row = [1];\n  for (let k = 0; k < n; k++) {\n    row.push((row[k]*(n-k))/(k+1));\n  }\n  return row;\n}"
+        },
+        {
+            "reference": "Rotates a string by a specified number of positions.",
+            "candidate": "Rotates characters in a string by k positions.\n\n@param {string} str - The input string.\n@param {number} k - The number of positions to rotate.\n@returns {string} The rotated string.\nExample: rotateString('abc',1) => 'cab'",
+            "source_code": "function rotateString(str, k) {\n  const n = str.length;\n  const steps = ((k%n)+n)%n;\n  return str.slice(-steps) + str.slice(0,n-steps);\n}"
+        }
+    ]
+}

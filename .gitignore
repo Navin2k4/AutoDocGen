@@ -21,7 +21,9 @@ Thumbs.db
 
 # Extension dev
 .autodocgen/           # your folder where history JSON is stored at runtime
+validation_test
 
 # Misc
 *.vsix
 .env
+*venv

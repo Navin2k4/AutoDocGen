@@ -12,7 +12,10 @@ import {
 } from "./core/modelManager";
 
 import { getStoredModel } from "./core/modelManager";
-import { isOllamaInstalled, promptInstallOllama } from "./core/ollamaUtils";
+import {
+  isOllamaInstalled,
+  promptInstallOllama,
+} from "./core/ollamaUtils";
 import { runPromptCommand } from "./commands/runPromptCommand";
 import {
   generateDocFromGroq,
@@ -133,18 +136,25 @@ export async function selectModelCommand(context: vscode.ExtensionContext) {
 }
 
 export async function downloadModel(modelName: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const terminal = vscode.window.createTerminal({
-      name: `Ollama: Download ${modelName}`,
-    });
-    terminal.show(true);
-    terminal.sendText(`ollama pull ${modelName}`);
-    vscode.window.showInformationMessage(
-      `Started downloading model: ${modelName}. Check terminal for progress.`
-    );
-    resolve();
+  // Terminal for Ollama server
+  const serveTerminal = vscode.window.createTerminal({
+    name: "Ollama: Server",
   });
+  serveTerminal.show(true);
+  serveTerminal.sendText("ollama serve");
+
+  // Terminal for model pull
+  const pullTerminal = vscode.window.createTerminal({
+    name: `Ollama: Download ${modelName}`,
+  });
+  pullTerminal.show(true);
+  pullTerminal.sendText(`ollama pull ${modelName}`);
+
+  vscode.window.showInformationMessage(
+    `Ollama server started, and model "${modelName}" download initiated. Check the respective terminals for logs.`
+  );
 }
+
 
 export async function activate(context: vscode.ExtensionContext) {
   await syncAvailableModelsWithDefaults();

@@ -24,9 +24,14 @@ Requirements:
 - Output ONLY a JSDoc block comment (/** ... */).
 - Do not include additional opening block of JSDOc
 - Use the standard JSDoc style with @param for each parameter and @returns.
+- Provide me some one or two example how the function returns like basic input and sample output generated from the function
 - Provide clear, professional descriptions for each parameter and the return value.
 - Do NOT include the function code, function signature, or any extra text.
 - Do NOT include Markdown fences (\`\`\`).
+- Write 1–2 sentences describing the function's purpose.
+- Use wording that mirrors typical human-written documentation.
+- Include @param and @returns with clear descriptions.
+- Include 1–2 simple input/output examples.
 - Do NOT restate the function name or definition.
 
 Function:
