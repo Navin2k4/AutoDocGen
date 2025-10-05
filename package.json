@@ -138,6 +138,12 @@
           },
           "default": [
             {
+              "name": "deepseek-coder:latest",
+              "value": "deepseek-coder:latest",
+              "size": "vary",
+              "performance": "Efficient"
+            },
+            {
               "name": "deepseek-coder:1.3b",
               "value": "deepseek-coder:1.3b",
               "size": "1.9 GB",

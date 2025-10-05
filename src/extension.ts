@@ -12,10 +12,7 @@ import {
 } from "./core/modelManager";
 
 import { getStoredModel } from "./core/modelManager";
-import {
-  isOllamaInstalled,
-  promptInstallOllama,
-} from "./core/ollamaUtils";
+import { isOllamaInstalled, promptInstallOllama } from "./core/ollamaUtils";
 import { runPromptCommand } from "./commands/runPromptCommand";
 import {
   generateDocFromGroq,
@@ -106,7 +103,7 @@ export async function selectModelCommand(context: vscode.ExtensionContext) {
   }
 
   // Check if the model is already downloaded
-  const modelExists = isModelDownloaded(modelData.value);
+  const modelExists = await isModelDownloaded(modelData.value);
   if (modelExists) {
     vscode.window.showInformationMessage(
       `You selected "${modelData.value}" Already downloaded.`
@@ -154,7 +151,6 @@ export async function downloadModel(modelName: string): Promise<void> {
     `Ollama server started, and model "${modelName}" download initiated. Check the respective terminals for logs.`
   );
 }
-
 
 export async function activate(context: vscode.ExtensionContext) {
   await syncAvailableModelsWithDefaults();
@@ -233,7 +229,7 @@ export async function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        const exists = isModelDownloaded(selectedLocalModel.value);
+        const exists = await isModelDownloaded(selectedLocalModel.value);
         if (!exists) {
           const proceed = await vscode.window.showInformationMessage(
             `The model "${selectedLocalModel.value}" is not downloaded. Download now via Ollama?`,
@@ -432,7 +428,7 @@ export async function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        const exists = isModelDownloaded(selectedLocalModel.value);
+        const exists = await isModelDownloaded(selectedLocalModel.value);
         if (!exists) {
           const proceed = await vscode.window.showInformationMessage(
             `The model "${selectedLocalModel.value}" is not downloaded. Download now via Ollama?`,
